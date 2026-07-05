@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/secureauth?options=-c%20TimeZone%3DUTC
+    username: secureauth
+    password: secureauth
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate.hibernate.format_sql: true
+    show-sql: true
+server:
+  port: 8085
