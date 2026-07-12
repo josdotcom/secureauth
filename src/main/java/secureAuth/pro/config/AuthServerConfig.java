@@ -12,9 +12,14 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import secureAuth.pro.security.TenantAuthenticationProvider;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -24,6 +29,16 @@ import java.util.UUID;
 
 @Configuration
 public class AuthServerConfig {
+
+    @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
 
     @Bean @Order(1)
     SecurityFilterChain authServer(HttpSecurity http) throws Exception {
@@ -39,10 +54,12 @@ public class AuthServerConfig {
         return http.build();
     }
 
-    @Bean @Order(2)
-    SecurityFilterChain appSecurity(HttpSecurity http) throws Exception {
+    @Bean
+    @Order(2)
+    SecurityFilterChain appSecurity(HttpSecurity http, TenantAuthenticationProvider tenantAuthenticationProvider) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
+                .authenticationProvider(tenantAuthenticationProvider)
+                .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/register", "/api/login","/login").permitAll()
                 .anyRequest().authenticated())

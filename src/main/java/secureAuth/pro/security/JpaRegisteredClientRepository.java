@@ -5,12 +5,15 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import secureAuth.pro.domain.ClientApp;
 import secureAuth.pro.repository.ClientAppRepository;
 
-import java.util.Optional;
+import java.time.Duration;
 import java.util.UUID;
 
 @Repository
@@ -54,12 +57,30 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
     private RegisteredClient toRegisteredClient(ClientApp clientApp) {
         return RegisteredClient.withId(clientApp.getId().toString())
                 .clientId(clientApp.getClientId().toString())
-                .clientSecret("{bcrypt}" + clientApp.getClientSecretHash())
+                .clientSecret(clientApp.getClientSecretHash())
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .authorizationGrantTypes(grantTypes ->
+                        clientApp.getGrantTypes().forEach(grantType -> grantTypes.add(mapGrantType(grantType)))
+                )
                 .redirectUris(uris -> uris.addAll(clientApp.getRedirectUris()))
                 .scopes(scopes -> scopes.addAll(clientApp.getScopes()))
+                .clientSettings(ClientSettings.builder()
+                        .requireProofKey(clientApp.isRequirePkce())
+                        .build()
+                )
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
+                        .accessTokenTimeToLive(Duration.ofMinutes(15))
+                        .build())
                 .build();
+    }
+
+    private AuthorizationGrantType mapGrantType(String value) {
+        return switch (value) {
+            case "authorization_code" -> AuthorizationGrantType.AUTHORIZATION_CODE;
+            case "refresh_token" -> AuthorizationGrantType.REFRESH_TOKEN;
+            case "client_credentials" -> AuthorizationGrantType.CLIENT_CREDENTIALS;
+            default -> throw new IllegalArgumentException("Invalid authorization grant type: " + value);
+        };
     }
 }

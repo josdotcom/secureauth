@@ -38,8 +38,8 @@ public class DevClientSeeder implements CommandLineRunner {
                 "Dev Test Client",
                 List.of("http://127.0.0.1:8085/login/oauth2/code/dev"),
                 List.of("openid", "profile", "email"),
-                List.of("authoriztion_code", "refresh_token"),
-                false,
+                List.of("authorization_code", "refresh_token"),
+                true,
                 DEV_TENANT_ID
         );
 
