@@ -11,5 +11,8 @@ spring:
     properties:
       hibernate.format_sql: true
     show-sql: true
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
 server:
   port: 8085

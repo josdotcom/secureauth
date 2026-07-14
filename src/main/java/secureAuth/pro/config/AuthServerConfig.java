@@ -10,21 +10,32 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import secureAuth.pro.security.TenantAuthenticationProvider;
+import secureAuth.pro.security.UserPrincipal;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Configuration
@@ -80,6 +91,43 @@ public class AuthServerConfig {
                 .build();
         JWKSet jwkSet = new JWKSet(rsaKey);
         return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    @Bean
+    OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
+        return context -> {
+            if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+                return;
+            }
+            if (!(context.getPrincipal().getPrincipal() instanceof UserPrincipal principal)) {
+                return;
+            }
+
+            List<String> roles = new ArrayList<>();
+            List<String> authorities = new ArrayList<>();
+            for (GrantedAuthority authority: principal.getAuthorities()) {
+                String value = authority.getAuthority();
+                if (value.startsWith("ROLE_")) {
+                    roles.add(value.substring("ROLE_".length()));
+                } else {
+                    authorities.add(value);
+                }
+            }
+
+            context.getClaims()
+                    .claim("tenant", principal.getTenantId().toString())
+                    .claim("uid", principal.getUserId().toString())
+                    .claim("roles", roles)
+                    .claim("authorities", authorities);
+        };
+    }
+
+    @Bean
+    public OAuth2AuthorizationService authorizationService(
+            JdbcOperations jdbcOperations,
+            RegisteredClientRepository registeredClientRepository
+    ) {
+        return new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository);
     }
 
     private KeyPair generateRSAKey() {

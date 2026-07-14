@@ -30,6 +30,7 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
     }
 
     @Override
+    @Transactional(readOnly = true)
     public @Nullable RegisteredClient findById(String id) {
         try {
             return clientAppRepository.findById(UUID.fromString(id))
