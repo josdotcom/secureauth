@@ -1,0 +1,18 @@
+<!Doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <title>Two Factor Authentication</title>
+</head>
+<body>
+    <h2>Two Factor Verification</h2>
+    <p>Enter the 6-digit code from your authenticator app (or a recovery code).</p>
+
+    <p th:if="${error}" th:text="${error}" style="color: red;"></p>
+
+    <form method="POST" action="/mfa">
+        <input type="text" name="code" placeholder="Code" autofocus autocomplete="off">
+        <button type="submit">Verify</button>
+    </form>
+</body>
+</html>

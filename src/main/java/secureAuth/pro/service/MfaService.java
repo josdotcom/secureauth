@@ -96,5 +96,29 @@ public class MfaService {
         return List.of(rawCodes);
     }
 
+    public boolean isMfaEnabled(UUID userId) {
+        return mfaSecretRepository.findByUser_Id(userId)
+                .map(MfaSecret::isConfirmed)
+                .orElse(false);
+    }
+
+    @Transactional
+    public boolean verifyLoginCode(UUID userId, String code) {
+        MfaSecret mfa = mfaSecretRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new MfaNotEnrolledException("No MFA configured for this user"));
+
+        String secret = encryptionService.decrypt(mfa.getEncryptedSecret());
+        if (codeVerifier.isValidCode(secret, code)) {
+            return true;
+        }
+
+        String hash = TokenHasher.sha256Hex(code);
+        if(mfa.getRecoveryCodes().remove(hash)) {
+            mfaSecretRepository.save(mfa);
+            return true;
+        }
+
+        return false;
+    }
     public record MfaEnrollmentResponse(String secret, String oauthUri) {};
 }

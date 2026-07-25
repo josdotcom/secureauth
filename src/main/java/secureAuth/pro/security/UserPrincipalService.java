@@ -39,4 +39,22 @@ public class UserPrincipalService {
                 user.getId(), user.getEmail(), user.getPasswordHash(), user.getTenantId(), user.isEnabled(), user.isLocked(), grantedAuthorities
         );
     }
+
+    @Transactional(readOnly = true)
+    public UserPrincipal loadByUserId(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("Invalid Credentials"));
+        return toPrincipal(user);
+    }
+
+    private UserPrincipal toPrincipal(User user) {
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        for (Role role: user.getRoles()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+            for(Permission permission: role.getPermissions()) {
+                authorities.add(new SimpleGrantedAuthority(permission.getName()));
+            }
+        }
+        return new UserPrincipal(user.getId(), user.getEmail(), user.getPasswordHash(), user.getTenantId(), user.isEnabled(), user.isLocked(), authorities);
+    }
 }

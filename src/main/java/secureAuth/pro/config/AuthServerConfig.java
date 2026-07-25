@@ -82,14 +82,16 @@ public class AuthServerConfig {
 
     @Bean
     @Order(2)
-    SecurityFilterChain appSecurity(HttpSecurity http, TenantAuthenticationProvider tenantAuthenticationProvider) throws Exception {
+    SecurityFilterChain appSecurity(HttpSecurity http,
+                                    TenantAuthenticationProvider tenantAuthenticationProvider,
+                                    MfaAuthenticationSuccessHandler mfaSuccessHandler) throws Exception {
         http
                 .authenticationProvider(tenantAuthenticationProvider)
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(a -> a
-                .requestMatchers("/api/register", "/api/login","/login").permitAll()
+                .requestMatchers("/api/register", "/api/login","/login", "/mfa").permitAll()
                 .anyRequest().authenticated())
-                .formLogin(Customizer.withDefaults())
+                .formLogin(form -> form.successHandler(mfaSuccessHandler))
                 .oauth2ResourceServer(rs -> rs.jwt(Customizer.withDefaults()));
         return http.build();
     }
