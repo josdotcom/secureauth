@@ -17,6 +17,8 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.jackson.SecurityJacksonModule;
+import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
@@ -27,8 +29,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import secureAuth.pro.repository.RefreshTokenRepository;
 import secureAuth.pro.security.TenantAuthenticationProvider;
+import secureAuth.pro.security.TrackingOAuth2AuthorizationService;
 import secureAuth.pro.security.UserPrincipal;
+import secureAuth.pro.security.UserPrincipalMixin;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -125,9 +132,27 @@ public class AuthServerConfig {
     @Bean
     public OAuth2AuthorizationService authorizationService(
             JdbcOperations jdbcOperations,
-            RegisteredClientRepository registeredClientRepository
+            RegisteredClientRepository registeredClientRepository,
+            RefreshTokenRepository refreshTokenRepository
     ) {
-        return new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository);
+        var service = new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository);
+        var ptvBuilder = BasicPolymorphicTypeValidator.builder().allowIfSubType(UserPrincipal.class);
+        var securityModules = SecurityJacksonModules.getModules(getClass().getClassLoader(), ptvBuilder);
+
+        var jsonMapper = JsonMapper.builder()
+                .addModules(securityModules)
+                .addMixIn(UserPrincipal.class, UserPrincipalMixin.class)
+                .build();
+
+        var rowMapper = new JdbcOAuth2AuthorizationService
+                .JsonMapperOAuth2AuthorizationRowMapper(registeredClientRepository, jsonMapper);
+        service.setAuthorizationRowMapper(rowMapper);
+
+        var parametersMapper = new JdbcOAuth2AuthorizationService
+                .JsonMapperOAuth2AuthorizationParametersMapper(jsonMapper);
+        service.setAuthorizationParametersMapper(parametersMapper);
+
+        return new TrackingOAuth2AuthorizationService(service, refreshTokenRepository, registeredClientRepository);
     }
 
     private KeyPair generateRSAKey() {

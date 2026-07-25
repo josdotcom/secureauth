@@ -72,6 +72,7 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
                         .accessTokenTimeToLive(Duration.ofMinutes(15))
+                        .reuseRefreshTokens(false)
                         .build())
                 .build();
     }
