@@ -12,6 +12,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.GrantedAuthority;
@@ -25,16 +26,14 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import secureAuth.pro.repository.AuditLogRepository;
 import secureAuth.pro.repository.RefreshTokenRepository;
-import secureAuth.pro.security.TenantAuthenticationProvider;
-import secureAuth.pro.security.TrackingOAuth2AuthorizationService;
-import secureAuth.pro.security.UserPrincipal;
-import secureAuth.pro.security.UserPrincipalMixin;
+import secureAuth.pro.security.*;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
@@ -47,6 +46,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Configuration
+@EnableMethodSecurity
 public class AuthServerConfig {
 
     @Bean
@@ -71,6 +71,13 @@ public class AuthServerConfig {
                 new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
         ));
         return http.build();
+    }
+
+    @Bean
+    JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(new JwtClaimsAuthoritiesConverter());
+        return converter;
     }
 
     @Bean
