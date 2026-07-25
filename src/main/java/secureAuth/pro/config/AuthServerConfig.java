@@ -86,6 +86,18 @@ public class AuthServerConfig {
                                     TenantAuthenticationProvider tenantAuthenticationProvider,
                                     MfaAuthenticationSuccessHandler mfaSuccessHandler) throws Exception {
         http
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self';"
+                                + "frame-ancestors 'none';"
+                                + "form-action 'self';"
+                                + "style-src 'self' 'unsafe-inline'"
+                        ))
+                        .httpStrictTransportSecurity(hsts ->hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)
+                        )
+                )
                 .authenticationProvider(tenantAuthenticationProvider)
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(a -> a

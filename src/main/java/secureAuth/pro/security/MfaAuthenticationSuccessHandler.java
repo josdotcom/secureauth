@@ -9,6 +9,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Component;
+import secureAuth.pro.domain.enums.AuditAction;
+import secureAuth.pro.service.AuditService;
 import secureAuth.pro.service.MfaService;
 
 import java.io.IOException;
@@ -18,9 +20,11 @@ public class MfaAuthenticationSuccessHandler extends SavedRequestAwareAuthentica
     public static final String MFA_PENDING_UID = "MFA_PENDING_UID";
 
     private final MfaService mfaService;
+    private final AuditService auditService;
 
-    public MfaAuthenticationSuccessHandler(MfaService mfaService) {
+    public MfaAuthenticationSuccessHandler(MfaService mfaService, AuditService auditService) {
         this.mfaService = mfaService;
+        this.auditService = auditService;
     }
 
     @Override
@@ -43,8 +47,10 @@ public class MfaAuthenticationSuccessHandler extends SavedRequestAwareAuthentica
                 session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
                 response.sendRedirect(request.getContextPath() + "/mfa");
             }
-            case AuthResult.Success success ->
+            case AuthResult.Success success -> {
+                auditService.record(AuditAction.LOGIN_SUCCESS, user.getTenantId(), user.getUserId(), user.getUsername(), RequestUtils.clientIp(request));
                 super.onAuthenticationSuccess(request, response, authentication);
+            }
             case AuthResult.Failure f ->
                 throw new IllegalStateException("Unexpected failure after successful authentication");
         }

@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import secureAuth.pro.domain.ClientApp;
+import secureAuth.pro.domain.enums.AuditAction;
 import secureAuth.pro.repository.ClientAppRepository;
+import secureAuth.pro.service.AuditService;
 
 import java.util.UUID;
 
@@ -23,11 +25,13 @@ public class TenantAuthenticationProvider implements AuthenticationProvider {
     private final ClientAppRepository clientAppRepository;
     private final PasswordEncoder passwordEncoder;
     private final RequestCache requestCache = new HttpSessionRequestCache();
+    private final AuditService auditService;
 
-    public TenantAuthenticationProvider(UserPrincipalService userPrincipalService, ClientAppRepository clientAppRepository, PasswordEncoder passwordEncoder) {
+    public TenantAuthenticationProvider(UserPrincipalService userPrincipalService, ClientAppRepository clientAppRepository, PasswordEncoder passwordEncoder, AuditService auditService) {
         this.userPrincipalService = userPrincipalService;
         this.clientAppRepository = clientAppRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditService = auditService;
     }
 
     @Override
@@ -40,21 +44,36 @@ public class TenantAuthenticationProvider implements AuthenticationProvider {
 
         UUID tenantId = resolveTenantId();
 
-        UserPrincipal principal = userPrincipalService.loadByTenantAndEmail(tenantId, email);
+        try {
+            UserPrincipal principal = userPrincipalService.loadByTenantAndEmail(tenantId, email);
 
-        if (!passwordEncoder.matches(rawPassword, principal.getPassword())) {
-            throw new BadCredentialsException("Invalid credentials");
-        }
-        if (!principal.isEnabled()) {
-            throw new DisabledException("Account disabled");
-        }
-        if (!principal.isAccountNonLocked()) {
-            throw new LockedException("Account locked");
-        }
+            if (!passwordEncoder.matches(rawPassword, principal.getPassword())) {
+                throw new BadCredentialsException("Invalid credentials");
+            }
+            if (!principal.isEnabled()) {
+                throw new DisabledException("Account disabled");
+            }
+            if (!principal.isAccountNonLocked()) {
+                throw new LockedException("Account locked");
+            }
 
-        return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+            return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        } catch (AuthenticationException e) {
+            auditService.record(AuditAction.LOGIN_FAILURE, tenantId, null, email, clientIp());
+            throw e;
+        }
     }
 
+    private String clientIp() {
+        var attrs = RequestContextHolder.getRequestAttributes();
+        if (!(attrs instanceof ServletRequestAttributes servletAttrs)) return null;
+        HttpServletRequest request = servletAttrs.getRequest();
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
     @Override
     public boolean supports(Class<?> authentication) {
         return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
