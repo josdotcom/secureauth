@@ -126,12 +126,10 @@
             <version>7.6.0</version>
             <scope>compile</scope>
         </dependency>
-        <!-- Source: https://mvnrepository.com/artifact/com.warrenstrange/googleauth -->
         <dependency>
-            <groupId>com.warrenstrange</groupId>
-            <artifactId>googleauth</artifactId>
-            <version>1.5.0</version>
-            <scope>compile</scope>
+            <groupId>dev.samstevens.totp</groupId>
+            <artifactId>totp</artifactId>
+            <version>1.7.1</version>
         </dependency>
         <!-- Source: https://mvnrepository.com/artifact/com.nimbusds/nimbus-jose-jwt -->
         <dependency>

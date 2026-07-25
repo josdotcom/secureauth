@@ -46,6 +46,11 @@ public class MfaSecret {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    public void confirm(List<String> recoveryCodeHashes) {
+        this.confirmed = true;
+        this.recoveryCodes = new ArrayList<>(recoveryCodeHashes);
+    }
+
     public MfaSecret(User user, String encryptedSecret, List<String> recoveryCodes) {
         this.user = user;
         this.encryptedSecret = encryptedSecret;
