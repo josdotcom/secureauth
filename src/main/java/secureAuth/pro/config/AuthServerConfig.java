@@ -29,6 +29,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import secureAuth.pro.repository.AuditLogRepository;
 import secureAuth.pro.repository.RefreshTokenRepository;
 import secureAuth.pro.security.TenantAuthenticationProvider;
 import secureAuth.pro.security.TrackingOAuth2AuthorizationService;
@@ -133,7 +134,8 @@ public class AuthServerConfig {
     public OAuth2AuthorizationService authorizationService(
             JdbcOperations jdbcOperations,
             RegisteredClientRepository registeredClientRepository,
-            RefreshTokenRepository refreshTokenRepository
+            RefreshTokenRepository refreshTokenRepository,
+            AuditLogRepository auditLogRepository
     ) {
         var service = new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository);
         var ptvBuilder = BasicPolymorphicTypeValidator.builder().allowIfSubType(UserPrincipal.class);
@@ -152,7 +154,7 @@ public class AuthServerConfig {
                 .JsonMapperOAuth2AuthorizationParametersMapper(jsonMapper);
         service.setAuthorizationParametersMapper(parametersMapper);
 
-        return new TrackingOAuth2AuthorizationService(service, refreshTokenRepository, registeredClientRepository);
+        return new TrackingOAuth2AuthorizationService(service, refreshTokenRepository, registeredClientRepository, auditLogRepository);
     }
 
     private KeyPair generateRSAKey() {
