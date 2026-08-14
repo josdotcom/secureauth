@@ -15,6 +15,8 @@ import java.util.UUID;
 public class DevClientSeeder implements CommandLineRunner {
     private static final UUID DEV_CLIENT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID DEV_TENANT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID SPA_CLIENT_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+
 
     private final ClientAppRepository clientAppRepository;
     private final PasswordEncoder passwordEncoder;
@@ -26,23 +28,35 @@ public class DevClientSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        if (clientAppRepository.findByClientId(DEV_CLIENT_ID).isPresent()) {
-            return;
+        if (clientAppRepository.findByClientId(DEV_CLIENT_ID).isEmpty()) {
+            String secretHash = passwordEncoder.encode("dev-secret");
+
+            ClientApp clientApp = ClientApp.confidential(
+                    DEV_CLIENT_ID,
+                    secretHash,
+                    "Dev Test Client",
+                    List.of("http://127.0.0.1:8085/login/oauth2/code/dev"),
+                    List.of("openid", "profile", "email"),
+                    List.of("authorization_code", "refresh_token"),
+                    true,
+                    DEV_TENANT_ID
+            );
+
+            clientAppRepository.save(clientApp);
         }
 
-        String secretHash = passwordEncoder.encode("dev-secret");
+        if (clientAppRepository.findByClientId(SPA_CLIENT_ID).isEmpty()) {
 
-        ClientApp clientApp = new ClientApp(
-                DEV_CLIENT_ID,
-                secretHash,
-                "Dev Test Client",
-                List.of("http://127.0.0.1:8085/login/oauth2/code/dev"),
-                List.of("openid", "profile", "email"),
-                List.of("authorization_code", "refresh_token"),
-                true,
-                DEV_TENANT_ID
-        );
+            ClientApp spa = ClientApp.publicClient(
+                    SPA_CLIENT_ID,
+                    "SecureAuth Demo SPA",
+                    List.of("http://127.0.0.1:5173/callback"),
+                    List.of("profile"),
+                    List.of("authorization_code", "refresh_token"),
+                    DEV_TENANT_ID
+            );
 
-        clientAppRepository.save(clientApp);
+            clientAppRepository.save(spa);
+        }
     }
 }

@@ -56,10 +56,9 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
     }
 
     private RegisteredClient toRegisteredClient(ClientApp clientApp) {
-        return RegisteredClient.withId(clientApp.getId().toString())
+        RegisteredClient.Builder builder = RegisteredClient.withId(clientApp.getId().toString())
                 .clientId(clientApp.getClientId().toString())
-                .clientSecret(clientApp.getClientSecretHash())
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .clientAuthenticationMethod(mapAuthMethod(clientApp.getClientAuthMethod()))
                 .authorizationGrantTypes(grantTypes ->
                         clientApp.getGrantTypes().forEach(grantType -> grantTypes.add(mapGrantType(grantType)))
                 )
@@ -67,22 +66,37 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
                 .scopes(scopes -> scopes.addAll(clientApp.getScopes()))
                 .clientSettings(ClientSettings.builder()
                         .requireProofKey(clientApp.isRequirePkce())
+                        .requireAuthorizationConsent(false)
                         .build()
                 )
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
                         .accessTokenTimeToLive(Duration.ofMinutes(15))
                         .reuseRefreshTokens(false)
-                        .build())
-                .build();
+                        .build());
+        if (clientApp.getClientSecretHash() != null) {
+            builder.clientSecret(clientApp.getClientSecretHash());
+        }
+
+        return builder.build();
     }
 
-    private AuthorizationGrantType mapGrantType(String value) {
+    private static AuthorizationGrantType mapGrantType(String value) {
         return switch (value) {
             case "authorization_code" -> AuthorizationGrantType.AUTHORIZATION_CODE;
             case "refresh_token" -> AuthorizationGrantType.REFRESH_TOKEN;
             case "client_credentials" -> AuthorizationGrantType.CLIENT_CREDENTIALS;
             default -> throw new IllegalArgumentException("Invalid authorization grant type: " + value);
+        };
+    }
+
+    private static ClientAuthenticationMethod mapAuthMethod(String authMethod) {
+        return switch (authMethod) {
+            case "client_secret_basic" -> ClientAuthenticationMethod.CLIENT_SECRET_BASIC;
+            case "client_secret_post" -> ClientAuthenticationMethod.CLIENT_SECRET_POST;
+            case "none" -> ClientAuthenticationMethod.NONE;
+            case "private_key_jwt" -> ClientAuthenticationMethod.PRIVATE_KEY_JWT;
+            default -> throw new IllegalArgumentException("Unsupported client authentication method: " + authMethod);
         };
     }
 }

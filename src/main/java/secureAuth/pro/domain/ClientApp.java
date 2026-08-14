@@ -19,6 +19,25 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ClientApp {
+
+    private static final String AUTH_METHOD_SECRET_BASIC = "client_secret_basic";
+    private static final String AUTH_METHOD_NONE = "none";
+
+    /** Server-side app that can keep a secret: authenticates with client_secret_basic. */
+    public static ClientApp confidential(UUID clientId, String clientSecretHash, String name,
+                                         List<String> redirectUris, List<String> scopes,
+                                         List<String> grantTypes, boolean requirePkce, UUID tenantId) {
+        return new ClientApp(clientId, clientSecretHash, AUTH_METHOD_SECRET_BASIC, name,
+                redirectUris, scopes, grantTypes, requirePkce, tenantId);
+    }
+
+    /** Browser SPA / native app: no secret is possible, so PKCE is mandatory. */
+    public static ClientApp publicClient(UUID clientId, String name, List<String> redirectUris,
+                                         List<String> scopes, List<String> grantTypes, UUID tenantId) {
+        return new ClientApp(clientId, null, AUTH_METHOD_NONE, name, redirectUris,
+                scopes, grantTypes, true, tenantId);
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Setter(AccessLevel.NONE)
@@ -28,8 +47,11 @@ public class ClientApp {
     @Column(name = "client_id", nullable = false, unique = true)
     private UUID clientId;
 
-    @Column(name = "client_secret_hash", nullable = false)
+    @Column(name = "client_secret_hash")
     private String clientSecretHash;
+
+    @Column(name = "client_auth_method", nullable = false, length = 50)
+    private String clientAuthMethod;
 
     @Column(length = 255)
     private String name;
@@ -65,9 +87,10 @@ public class ClientApp {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public ClientApp(UUID clientId, String clientSecretHash, String name, List<String> redirectUris, List<String> scopes, List<String> grantTypes, boolean requirePkce, UUID tenantId) {
+    private ClientApp(UUID clientId, String clientSecretHash, String clientAuthMethod, String name, List<String> redirectUris, List<String> scopes, List<String> grantTypes, boolean requirePkce, UUID tenantId) {
         this.clientId = clientId;
         this.clientSecretHash = clientSecretHash;
+        this.clientAuthMethod = clientAuthMethod;
         this.name = name;
         this.redirectUris = redirectUris;
         this.scopes = scopes;

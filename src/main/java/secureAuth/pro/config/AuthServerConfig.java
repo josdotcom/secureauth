@@ -29,6 +29,8 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import secureAuth.pro.repository.AuditLogRepository;
@@ -59,13 +61,21 @@ public class AuthServerConfig {
         return new HttpSessionEventPublisher();
     }
 
+    @Bean
+    RequestCache authorizeRequestCache() {
+        HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
+        requestCache.setRequestMatcher(request -> "/oauth2/authorize".equals(request.getRequestURI()));
+        return requestCache;
+    }
+
     @Bean @Order(1)
-    SecurityFilterChain authServer(HttpSecurity http) throws Exception {
+    SecurityFilterChain authServer(HttpSecurity http, RequestCache authorizeRequestCache) throws Exception {
         http.oauth2AuthorizationServer(authServer-> {
             http.securityMatcher(authServer.getEndpointsMatcher());
             authServer.oidc(Customizer.withDefaults());
         })
         .authorizeHttpRequests(a -> a.anyRequest().authenticated())
+        .requestCache(cache -> cache.requestCache(authorizeRequestCache))
         .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(
                 new LoginUrlAuthenticationEntryPoint("/login"),
                 new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
@@ -84,7 +94,8 @@ public class AuthServerConfig {
     @Order(2)
     SecurityFilterChain appSecurity(HttpSecurity http,
                                     TenantAuthenticationProvider tenantAuthenticationProvider,
-                                    MfaAuthenticationSuccessHandler mfaSuccessHandler) throws Exception {
+                                    MfaAuthenticationSuccessHandler mfaSuccessHandler,
+                                    RequestCache authorizeRequestCache) throws Exception {
         http
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
@@ -100,6 +111,7 @@ public class AuthServerConfig {
                 )
                 .authenticationProvider(tenantAuthenticationProvider)
                 .csrf(AbstractHttpConfigurer::disable)
+                .requestCache(cache -> cache.requestCache(authorizeRequestCache))
                 .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/register", "/api/login","/login", "/mfa").permitAll()
                 .anyRequest().authenticated())

@@ -4,6 +4,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
@@ -21,6 +23,7 @@ public class MfaAuthenticationSuccessHandler extends SavedRequestAwareAuthentica
 
     private final MfaService mfaService;
     private final AuditService auditService;
+    private static final Logger log = LoggerFactory.getLogger(MfaAuthenticationSuccessHandler.class);
 
     public MfaAuthenticationSuccessHandler(MfaService mfaService, AuditService auditService) {
         this.mfaService = mfaService;
@@ -46,6 +49,7 @@ public class MfaAuthenticationSuccessHandler extends SavedRequestAwareAuthentica
                 SecurityContextHolder.clearContext();
                 session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
                 response.sendRedirect(request.getContextPath() + "/mfa");
+                log.info("MFA POST: session={} pending={}", session.getId(), m.userId());
             }
             case AuthResult.Success success -> {
                 auditService.record(AuditAction.LOGIN_SUCCESS, user.getTenantId(), user.getUserId(), user.getUsername(), RequestUtils.clientIp(request));
