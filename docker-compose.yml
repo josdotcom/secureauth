@@ -1,4 +1,18 @@
 services:
+  app:
+    build: .
+    container_name: secureauth-app
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secureauth?options=-c%20TimeZone%3DUTC
+      SPRING_DATASOURCE_USERNAME: secureauth
+      SPRING_DATASOURCE_PASSWORD: secureauth
+      SECUREAUTH_MFA_ENCRYPTION_KEY: ${SECUREAUTH_MFA_ENCRYPTION_KEY}
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
   postgres:
     image: postgres:16
     container_name: secureauth-db
