@@ -24,9 +24,12 @@ import org.springframework.util.Assert;
  *
  * <p>This deployment has them. The OAuth 2.0 for Browser-Based Apps BCP permits refresh
  * tokens for public clients provided they are one-time-use, rotated on every refresh, and
- * that detected reuse revokes the entire token family. SecureAuth implements all three in
- * the refresh-token rotation decorator (see TODO: your Task 8 decorator class), which also
- * writes a tenant-scoped TOKEN_REUSE_DETECTED audit row on reuse.
+ * that detected reuse revokes the entire token family. SecureAuth implements all three:
+ * rotation is forced by {@code TokenSettings.reuseRefreshTokens(false)} in
+ * {@link JpaRegisteredClientRepository#toRegisteredClient}; family lineage is recorded by
+ * {@link TrackingOAuth2AuthorizationService#recordLineage}; and reuse is detected in
+ * {@link TrackingOAuth2AuthorizationService#findByToken}, which revokes the whole family
+ * and writes a tenant-scoped {@code TOKEN_REUSE_DETECTED} audit row.
  *
  * <p>This class is otherwise an exact copy of the framework generator. Do NOT restore the
  * public-client check without first removing the rotation guarantees above — the two are

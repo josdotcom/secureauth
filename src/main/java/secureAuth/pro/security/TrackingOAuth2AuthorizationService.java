@@ -15,10 +15,12 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import secureAuth.pro.domain.AuditLog;
 import secureAuth.pro.domain.RefreshToken;
+import secureAuth.pro.domain.User;
 import secureAuth.pro.domain.enums.AuditAction;
 import secureAuth.pro.domain.enums.TokenStatus;
 import secureAuth.pro.repository.AuditLogRepository;
 import secureAuth.pro.repository.RefreshTokenRepository;
+import secureAuth.pro.repository.UserRepository;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -27,17 +29,19 @@ import java.util.UUID;
 import static secureAuth.pro.security.TokenHasher.sha256Hex;
 
 public class TrackingOAuth2AuthorizationService implements OAuth2AuthorizationService {
+    private final UserRepository userRepository;
     private final OAuth2AuthorizationService delegate;
     private final RefreshTokenRepository refreshTokenRepository;
     private final RegisteredClientRepository registeredClientRepository;
     private final AuditLogRepository auditLogRepository;
     private static final Logger log = LoggerFactory.getLogger(TrackingOAuth2AuthorizationService.class);
 
-    public TrackingOAuth2AuthorizationService(OAuth2AuthorizationService delegate, RefreshTokenRepository refreshTokenRepository, RegisteredClientRepository registeredClientRepository, AuditLogRepository auditLogRepository) {
+    public TrackingOAuth2AuthorizationService(OAuth2AuthorizationService delegate, RefreshTokenRepository refreshTokenRepository, RegisteredClientRepository registeredClientRepository, AuditLogRepository auditLogRepository, UserRepository userRepository) {
         this.delegate = delegate;
         this.refreshTokenRepository = refreshTokenRepository;
         this.registeredClientRepository = registeredClientRepository;
         this.auditLogRepository = auditLogRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -65,17 +69,38 @@ public class TrackingOAuth2AuthorizationService implements OAuth2AuthorizationSe
             var tracked = refreshTokenRepository.findByTokenHash(hash);
             if (tracked.isPresent()) {
                 RefreshToken retired = tracked.get();
-                if (retired.getStatus()== TokenStatus.ROTATED || retired.getStatus() == TokenStatus.REVOKED) {
+                if (retired.getStatus() == TokenStatus.ROTATED || retired.getStatus() == TokenStatus.REVOKED) {
                     refreshTokenRepository.revokeFamily(retired.getFamilyId());
+
+                    // The authorization exists only on the FIRST reuse - we remove it here. Every
+                    // later replay of the same stolen token finds null, so sourcing tenantId from it
+                    // alone meant repeat attempts went unaudited: the table said "one attempt"
+                    // whether it was one or ten thousand.
                     OAuth2Authorization active = delegate.findById(retired.getFamilyId().toString());
+                    UUID tenantId = null;
                     if (active != null) {
                         delegate.remove(active);
                         Authentication auth = active.getAttribute(java.security.Principal.class.getName());
-                        UUID tenantId = (auth != null && auth.getPrincipal() instanceof UserPrincipal up) ? up.getTenantId() : null;
-                        AuditLog auditLog = new AuditLog(null, retired.getUserId(), AuditAction.TOKEN_REUSE_DETECTED, "refresh_token_family:" + retired.getFamilyId(), clientIp(), tenantId);
-                        auditLogRepository.save(auditLog);
+                        tenantId = (auth != null && auth.getPrincipal() instanceof UserPrincipal up)
+                                ? up.getTenantId() : null;
                     }
-                    log.warn("Refresh-token reuse detected - revoking family {} for user {}", retired.getFamilyId(), retired.getUserId());
+                    if (tenantId == null && retired.getUserId() != null) {
+                        tenantId = userRepository.findById(retired.getUserId())
+                                .map(User::getTenantId)
+                                .orElse(null);
+                    }
+
+                    if (tenantId != null) {
+                        auditLogRepository.save(new AuditLog(null, retired.getUserId(),
+                                AuditAction.TOKEN_REUSE_DETECTED,
+                                "refresh_token_family:" + retired.getFamilyId(), clientIp(), tenantId));
+                    } else {
+                        log.error("Reuse detected for family {} but tenant could not be resolved; "
+                                + "audit row skipped", retired.getFamilyId());
+                    }
+
+                    log.warn("Refresh-token reuse detected - revoking family {} for user {}",
+                            retired.getFamilyId(), retired.getUserId());
                 }
             }
         }
